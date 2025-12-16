@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Judul Halaman yang muncul di tab browser -->
+    <title>Aplikasi Kotak Masuk Rahasia Departemen</title>
+    <!-- Muat Tailwind CSS untuk styling modern dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Menggunakan font Inter untuk tampilan profesional */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Pale blue background */
+            min-height: 100vh;
+        }
+        .card {
+            /* Efek bayangan yang lembut */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+        }
+        .message-box {
+            /* Garis kiri untuk menyoroti pesan */
+            border-left-width: 4px;
+        }
+        .privacy-alert {
+            /* Animasi berdenyut untuk menarik perhatian pada peringatan */
+            animation: pulse-bg 3s infinite;
+        }
+        @keyframes pulse-bg {
+            0%, 100% { background-color: #fef3c7; } /* Kuning muda */
+            50% { background-color: #fde68a; } /* Kuning yang sedikit lebih gelap */
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto">
+        <header class="text-center mb-10 p-6 bg-white rounded-xl shadow-lg">
+            <!-- Judul Utama -->
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-red-700">Hai, adakah yang ingin kamu sampaikan untukku?</h1>
+            <p class="text-gray-600 mt-2">Kirim umpan balik anonim dan lindungi pesan masuk Anda dengan kunci rahasia.</p>
+        </header>
+
+        <!-- Peringatan Penting dan Info Keamanan -->
+        <div class="privacy-alert p-4 rounded-lg border border-yellow-500 mb-6">
+            <h3 class="text-base font-semibold text-red-800 mb-2">🔒 Sistem Keamanan (Simulasi Kunci)</h3>
+            <ul class="list-disc list-inside text-sm text-yellow-900 space-y-1">
+                <li>*Kunci:* Pesan masuk Anda dilindungi dengan kunci rahasia yang terasosiasi dengan nama Anda.</li>
+                <li>*Anonimitas:* Pengirim TIDAK dicatat. Pesan akan selalu berlabel "RAHASIA".</li>
+            </ul>
+        </div>
+        
+        <!-- Menampilkan ID Sesi Firebase (Untuk Debugging/Otentikasi) -->
+        <div class="bg-gray-100 p-3 rounded-lg border border-gray-200 mb-6">
+            <p class="text-sm text-gray-700 font-medium">ID Sesi Anda (Otentikasi Firebase): <span id="user-id-display" class="font-mono text-xs break-all text-gray-900">Authenticating...</span></p>
+        </div>
+
+        <!-- Layout Utama (Form dan Kotak Masuk) -->
+        <div id="app-flow" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Kolom Kiri: Akses dan Pengiriman Pesan -->
+            <div class="bg-white p-6 rounded-xl card lg:col-span-1 h-fit">
+                
+                <h2 class="text-2xl font-bold mb-4 text-gray-700 border-b pb-2">Langkah 1: Akses Kotak Masuk</h2>
+                
+                <!-- Pemilihan Peran (Self-Select) -->
+                <div class="mb-4">
+                    <label for="self-select" class="block text-sm font-medium text-gray-700 mb-1">Pilih Diri Anda (Akan menentukan Kotak Masuk Anda):</label>
+                    <select id="self-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 bg-white shadow-sm">
+                        <option value="" disabled selected>-- Pilih Siapa Anda --</option>
+                        <!-- Options filled by JS -->
+                    </select>
+                </div>
+
+                <!-- Input Kunci Rahasia -->
+                <div class="mb-4">
+                    <label for="key-input" class="block text-sm font-medium text-gray-700 mb-1">Masukkan Kunci Rahasia Anda:</label>
+                    <div class="flex space-x-2">
+                         <input type="password" id="key-input" placeholder="Masukkan kunci..."
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition duration-150" disabled>
+                        <button id="unlock-button"
+                                class="px-4 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition duration-150 disabled:bg-red-400"
+                                onclick="validateKey()" disabled>
+                            Buka Kunci
+                        </button>
+                    </div>
+                </div>
+                <p id="key-status" class="text-sm text-center font-medium mb-6"></p>
+
+                <!-- Form Kirim Pesan (Akan diaktifkan setelah kunci benar) -->
+                <div id="send-form" class="opacity-50 pointer-events-none transition-opacity duration-300">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-700 border-b pb-2 mt-8">Langkah 2: Kirim Pesan Anonim</h2>
+                    
+                    <!-- Pemilihan Penerima -->
+                    <div class="mb-4">
+                        <label for="recipient-select" class="block text-sm font-medium text-gray-700 mb-1">Pilih Penerima Pesan:</label>
+                        <select id="recipient-select" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 shadow-sm" disabled>
+                            <option value="" disabled selected>Pilih peran dan buka kunci dulu</option>
+                        </select>
+                    </div>
+
+                    <!-- Input Pesan -->
+                    <div class="mb-4">
+                        <label for="message-input" class="block text-sm font-medium text-gray-700 mb-1">Tulis Kesan & Pesan Anonim Anda:</label>
+                        <textarea id="message-input" rows="4" placeholder="Pesan ini akan menjadi rahasia dan tidak mencantumkan identitas pengirim..."
+                                  class="w-full p-3 border border-gray-300 rounded-lg resize-none"
+                                  maxlength="500" disabled></textarea>
+                    </div>
+
+                    <div class="flex flex-col space-y-3">
+                        <button id="send-button"
+                                class="w-full px-6 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 disabled:bg-red-400"
+                                disabled>
+                            Kirim Pesan Anonim
+                        </button>
+                        <p id="status-message" class="text-center text-sm mt-3"></p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Kolom Kanan: Kotak Masuk Pribadi -->
+            <div class="bg-white p-6 rounded-xl card lg:col-span-1">
+                <h2 class="text-2xl font-bold mb-4 text-gray-700 border-b pb-2">Kotak Masuk Pribadi: <span id="current-recipient-name" class="text-red-600">Menunggu Kunci...</span></h2>
+                <div id="messages-container" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <p id="loading-indicator" class="text-center text-gray-500 p-4">Masukkan kunci rahasia Anda di sebelah kiri untuk memuat pesan.</p>
+                    <!-- Pesan akan dimuat di sini -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Blok JavaScript dengan Integrasi Firebase (Core Logic) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, addDoc, onSnapshot, collection, query, where, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuration and Global Variables ---
+        // Global variables provided by the Canvas environment (Mandatory for Firebase access)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId = null;
+        let unsubscribeListener = null; 
+        let currentRoleName = null; 
+        let isKeyValidated = false; 
+
+        // Daftar anggota departemen dan kunci rahasia (Hardcoded dalam JS untuk keamanan data yang ringan)
+        const DEPARTMENT_MEMBERS = [
+            { name: 'Aep Saepudin', key: 'aps123' },
+            { name: 'Martina', key: 'mht234' },
+            { name: 'Katherine', key: 'kal345' },
+            { name: 'Trixie', key: 'tpp456' },
+            { name: 'Rizki Angga', key: 'raa567' },
+            { name: 'Serly', key: 'sgt678' },
+            { name: 'Dela', key: 'dme789' },
+            { name: 'Aim', key: 'aim890' },
+            { name: 'Anggita', key: 'apz901' },
+            { name: 'Vidya', key: 'avv012' },
+            { name: 'Bias', key: 'bkr123' },
+            { name: 'Dian', key: 'dfy234' },
+            { name: 'Fanny', key: 'fdg345' },
+            { name: 'Fafa', key: 'fzr456' },
+            { name: 'Hana', key: 'hkh567' },
+            { name: 'Irma', key: 'iff678' },
+            { name: 'Bu Yuni', key: 'swh789' },
+            { name: 'Lulut', key: 'ldj890' },
+            { name: 'Lusiana', key: 'lde901' },
+            { name: 'Muthia', key: 'muf012' },
+            { name: 'Nadira', key: 'nav123' },
+            { name: 'Ryan', key: 'ink234' },
+            { name: 'Pradia', key: 'pep345' },
+            { name: 'Alvina', key: 'avj456' },
+            { name: 'Rafly', key: 'rbl567' },
+            { name: 'Reyhan', key: 'mrx678' },
+            { name: 'Riskayati', key: 'rat789' },
+            { name: 'Shasa', key: 'shs890' },
+            { name: 'Anin', key: 'aza901' },
+            { name: 'Assa', key: 'aaz012' },
+            { name: 'Cakra', key: 'cfh123' },
+            { name: 'Nhimas', key: 'nml234' },
+            { name: 'Putri', key: 'psa345' },
+            { name: 'Run', key: 'run456' },
+            { name: 'Rara', key: 'tnt567' },
+            { name: 'Raia', key: 'rcl678' },
+            { name: 'Kenny', key: 'rkc789' },
+            { name: 'Dani', key: 'rax890' },
+            { name: 'Salma', key: 'sdt901' },
+            { name: 'Syahel', key: 'nzw012' },
+            { name: 'Yaya', key: 'ddc123' },
+            { name: 'Zahra', key: 'ajm234' },
+            { name: 'Dimas', key: 'dim345' },
+            { name: 'Suhendar', key: 'suh456' },
+        ];
+
+        // --- UI Elements (Mengambil elemen DOM) ---
+        const selfSelect = document.getElementById('self-select');
+        const keyInput = document.getElementById('key-input');
+        const unlockButton = document.getElementById('unlock-button');
+        const keyStatus = document.getElementById('key-status');
+        const sendForm = document.getElementById('send-form');
+
+        const recipientSelect = document.getElementById('recipient-select');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const messagesContainer = document.getElementById('messages-container');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const currentRecipientName = document.getElementById('current-recipient-name');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const statusMessage = document.getElementById('status-message');
+
+        // --- Utility & UI Functions ---
+
+        /**
+         * Mengatur status form pengiriman pesan (diaktifkan/dinonaktifkan).
+         * @param {boolean} enabled - True untuk mengaktifkan, false untuk menonaktifkan.
+         */
+        function setFormEnabled(enabled) {
+            isKeyValidated = enabled;
+            // Mengubah tampilan dan interaksi form pengiriman
+            sendForm.classList.toggle('opacity-50', !enabled);
+            sendForm.classList.toggle('pointer-events-none', !enabled);
+            
+            recipientSelect.disabled = !enabled;
+            messageInput.disabled = !enabled;
+            sendButton.disabled = !enabled;
+
+            // Memperbarui dropdown penerima
+            recipientSelect.innerHTML = '<option value="" disabled selected>' + 
+                                        (enabled ? 'Pilih rekan kerja penerima' : 'Pilih peran dan buka kunci dulu') + 
+                                        '</option>';
+            if (enabled) {
+                populateRecipientDropdown();
+            }
+        }
+
+        /**
+         * Menampilkan status atau pesan kesalahan di UI.
+         * @param {string} message - Konten pesan.
+         * @param {string} type - 'error', 'success', atau 'info'.
+         * @param {HTMLElement} [element=statusMessage] - Elemen untuk menampilkan pesan.
+         */
+        function displayStatus(message, type, element = statusMessage) {
+            element.textContent = message;
+            // Menghapus dan menambahkan kelas warna sesuai jenis pesan
+            element.classList.remove('text-red-500', 'text-green-500', 'text-gray-500', 'text-yellow-900');
+
+            if (type === 'error') {
+                element.classList.add('text-red-500', 'font-medium');
+            } else if (type === 'success') {
+                element.classList.add('text-green-500', 'font-medium');
+                // Menghilangkan pesan sukses setelah 4 detik
+                if (element === statusMessage) setTimeout(() => element.textContent = '', 4000);
+            } else {
+                 element.classList.add('text-yellow-900');
+            }
+        }
+
+        /**
+         * Sanitasi dasar untuk konten yang dihasilkan pengguna (mencegah XSS).
+         * @param {string} str - String yang akan disanitasi.
+         * @returns {string} String yang sudah disanitasi.
+         */
+        function sanitizeHTML(str) {
+            if (!str) return '';
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
+        // --- Firebase Initialization & UI Population ---
+
+        /**
+         * Mengisi dropdown pemilihan peran diri sendiri.
+         */
+        function populateSelfDropdown() {
+            selfSelect.innerHTML = '<option value="" disabled selected>-- Pilih Siapa Anda --</option>';
+            DEPARTMENT_MEMBERS.forEach(member => {
+                const selfOption = document.createElement('option');
+                selfOption.value = member.name;
+                selfOption.textContent = member.name;
+                selfSelect.appendChild(selfOption);
+            });
+        }
+        
+        /**
+         * Mengisi dropdown penerima pesan.
+         */
+        function populateRecipientDropdown() {
+            recipientSelect.innerHTML = '<option value="" disabled selected>Pilih rekan kerja penerima</option>';
+            DEPARTMENT_MEMBERS.forEach(member => {
+                const recipientOption = document.createElement('option');
+                recipientOption.value = member.name;
+                recipientOption.textContent = member.name;
+                recipientSelect.appendChild(recipientOption);
+            });
+        }
+
+
+        /**
+         * Menginisialisasi Firebase dan melakukan otentikasi.
+         */
+        async function initializeFirebase() {
+            try {
+                // Mengisi dropdown segera
+                populateSelfDropdown(); 
+                keyInput.disabled = false;
+                unlockButton.disabled = false;
+                selfSelect.addEventListener('change', handleSelfSelection);
+
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                    displayStatus("Peringatan: Konfigurasi Firebase hilang. Fitur database tidak aktif.", 'error', userIdDisplay);
+                } else {
+                    setLogLevel('Debug'); // Aktifkan logging debug untuk Firebase
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    // Proses Otentikasi
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                }
+
+                // Listener untuk mendapatkan ID pengguna setelah otentikasi selesai
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        console.log("Authentication successful. User ID:", userId);
+                    } else {
+                        userIdDisplay.textContent = 'Auth Failed / Anonymous';
+                        console.log("User not authenticated.");
+                    }
+                });
+
+            } catch (error) {
+                console.error("Failed to initialize Firebase or authenticate:", error);
+                userIdDisplay.textContent = "Initialization Failed: " + error.message;
+                displayStatus("Gagal memuat aplikasi. Cek konsol.", 'error', keyStatus);
+            }
+        }
+
+        // --- Key & Role Logic ---
+
+        function handleSelfSelection(event) {
+            currentRoleName = event.target.value;
+            currentRecipientName.textContent = currentRoleName + ' (Terkunci)';
+            
+            // Reset UI dan status kunci
+            setFormEnabled(false);
+            keyInput.value = '';
+            displayStatus("Masukkan kunci untuk membuka kotak masuk.", 'info', keyStatus);
+            messagesContainer.innerHTML = '<p class="text-center text-gray-500 p-4">Masukkan kunci rahasia Anda di sebelah kiri untuk memuat pesan.</p>';
+            
+            // Hentikan listener Firestore sebelumnya jika ada
+            if (unsubscribeListener) {
+                unsubscribeListener();
+            }
+            keyInput.focus(); 
+        }
+
+        /**
+         * Memvalidasi kunci yang dimasukkan.
+         */
+        window.validateKey = () => {
+            const enteredKey = keyInput.value.trim();
+            if (!currentRoleName) {
+                displayStatus("Pilih peran Anda terlebih dahulu.", 'error', keyStatus);
+                return;
+            }
+
+            const member = DEPARTMENT_MEMBERS.find(m => m.name === currentRoleName);
+            
+            if (member && member.key === enteredKey) {
+                displayStatus("Kunci Benar! Kotak Masuk dan Form Pengiriman Diaktifkan.", 'success', keyStatus);
+                currentRecipientName.textContent = currentRoleName;
+                setFormEnabled(true);
+                // Mulai mendengarkan pesan dari Firestore
+                if (db) {
+                    setupMessageListener(currentRoleName); 
+                } else {
+                    console.warn("Firestore tidak aktif.");
+                    messagesContainer.innerHTML = '<p class="text-red-500 p-4">Aplikasi berjalan tanpa database. Tidak dapat memuat atau menyimpan pesan.</p>';
+                }
+                recipientSelect.focus();
+            } else {
+                displayStatus("Kunci Salah. Akses Ditolak.", 'error', keyStatus);
+                setFormEnabled(false);
+            }
+        };
+
+
+        // --- Firestore Data Listener (Kotak Masuk Pribadi) ---
+
+        /**
+         * Mengatur listener real-time untuk pesan.
+         * @param {string} recipientName - Nama penerima yang sedang dilihat kotak masuknya.
+         */
+        function setupMessageListener(recipientName) {
+            // Hentikan listener lama
+            if (unsubscribeListener) {
+                unsubscribeListener();
+            }
+
+            if (!db) return; 
+
+            loadingIndicator.classList.remove('hidden');
+            messagesContainer.innerHTML = ''; 
+
+            // Path koleksi publik
+            const feedbackCollectionPath = artifacts/${appId}/public/data/anonymous_feedback;
+
+            // Query: Ambil semua pesan untuk recipientName ini
+            const q = query(
+                collection(db, feedbackCollectionPath),
+                where("recipientName", "==", recipientName)
+            );
+
+            // Listener real-time
+            unsubscribeListener = onSnapshot(q, (snapshot) => {
+                const messages = [];
+                snapshot.forEach((doc) => {
+                    messages.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Urutkan pesan berdasarkan timestamp (terbaru lebih dulu)
+                messages.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
+
+                renderMessages(messages);
+                loadingIndicator.classList.add('hidden');
+
+            }, (error) => {
+                console.error("Error listening to messages:", error);
+                messagesContainer.innerHTML = '<p class="text-red-500 p-4">Error memuat pesan. Cek konsol.</p>';
+            });
+        }
+
+        /**
+         * Merender daftar pesan ke UI.
+         * @param {Array<Object>} messages - Array objek pesan.
+         */
+        function renderMessages(messages) {
+            messagesContainer.innerHTML = ''; 
+            if (messages.length === 0) {
+                messagesContainer.innerHTML = '<p class="text-center text-gray-500 p-4">Kotak masuk Anda kosong. Belum ada pesan anonim untuk Anda.</p>';
+                return;
+            }
+
+            messages.forEach(msg => {
+                const date = msg.timestamp ? new Date(msg.timestamp.toMillis()).toLocaleString() : 'Baru saja';
+
+                const messageElement = `
+                    <div class="message-box p-4 rounded-xl bg-green-50 border-green-400 shadow-md">
+                        <p class="text-gray-800 whitespace-pre-wrap text-base">${sanitizeHTML(msg.message)}</p>
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs mt-3 pt-2 border-t border-gray-200 text-gray-500">
+                            <div class="flex items-center">
+                                <span class="font-semibold text-green-700 mr-2">Pengirim:</span>
+                                <span class="font-bold text-sm text-green-900">RAHASIA</span>
+                            </div>
+                            <span class="mt-1 sm:mt-0 text-right">${date}</span>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.insertAdjacentHTML('beforeend', messageElement);
+            });
+        }
+
+        // --- Send Message Event Handler ---
+
+        sendButton.addEventListener('click', async () => {
+            const recipientName = recipientSelect.value;
+            const content = messageInput.value.trim();
+
+            if (!isKeyValidated || !db || !recipientName || !content) {
+                 displayStatus("Periksa kunci, penerima, dan pesan.", 'error');
+                 return;
+            }
+
+            sendButton.disabled = true;
+            sendButton.textContent = 'Mengirim Rahasia...';
+            displayStatus("Mengirim pesan rahasia...", 'info');
+
+            try {
+                // Path koleksi publik di Firestore
+                const feedbackCollectionPath = artifacts/${appId}/public/data/anonymous_feedback;
+
+                // Simpan pesan
+                await addDoc(collection(db, feedbackCollectionPath), {
+                    recipientName: recipientName,
+                    message: content,
+                    timestamp: serverTimestamp()
+                });
+
+                messageInput.value = '';
+                displayStatus(Pesan anonim berhasil dikirim untuk ${recipientName}!, 'success');
+
+            } catch (error) {
+                console.error("Error sending message:", error);
+                displayStatus("Gagal mengirim pesan: " + error.message, 'error');
+            } finally {
+                sendButton.disabled = false;
+                sendButton.textContent = 'Kirim Pesan Anonim';
+            }
+        });
+
+        // Panggil fungsi inisialisasi saat script dimuat
+        initializeFirebase();
+    </script>
+</body>
+</html>
+              
